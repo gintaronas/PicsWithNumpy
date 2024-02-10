@@ -1,12 +1,21 @@
+import os
+import sys
+import configparser
+import easygui
 import numpy as np
 from PIL import Image
 
-# Load an image
-image_path = 'cat.jpg'
-image = Image.open(image_path)
-width, height = image.size
-print(f"Width: {width}px, Height: {height}px")
-
+# Load an image or exit, if not selected
+try:
+    image_path = easygui.fileopenbox(default="input/*")
+    image = Image.open(image_path)
+    width, height = image.size
+    print(f"Original picture. Width: {width}px, Height: {height}px")
+except:  # whatever happens otherwise - exit
+    sys.exit()
+# print(f'{image_path}')
+head, tail = os.path.split(image_path)
+# print(f'{tail}')
 # Show the original image
 image.show()
 
@@ -16,9 +25,28 @@ start_row, start_col = 0, 0
 end_row = height
 end_col = width
 
-num_v_slices = 320
-slice_width = width // num_v_slices
 
+#  Let's determine the number of slices to be used
+
+
+def num_of_slices(width_pix: int, desired_sl_width: int):
+    num_slices = width_pix // desired_sl_width
+    remainder_width = width_pix % desired_sl_width
+    actual_slice_width = desired_sl_width
+    if remainder_width > 0:
+        actual_slice_width += remainder_width // num_slices
+    return num_slices, actual_slice_width
+
+
+config = configparser.ConfigParser()
+config.read('config.ini')
+desired_slice_width = int(config['Settings']['desired_slice_width'])
+
+slicing_v = num_of_slices(width, desired_slice_width)
+
+num_v_slices = slicing_v[0]
+slice_width = slicing_v[1]
+print(f'Slicing vertically by stripes of {slice_width}px')
 slices1 = []
 slices2 = []
 
@@ -41,16 +69,15 @@ joined_image2 = Image.fromarray(joined_img_array2)
 joined_image = Image.fromarray(joined_img_array)
 
 height, width, channels = joined_img_array.shape
-print(f"Width: {width}px, Height: {height}px")
+print(f'Vertically sliced and concatenated. Width: {width}px, Height: {height}px')
 
-# Display and save the joined image
-# joined_image1.show()
-# joined_image2.show()
 joined_image.show()
 
-num_h_slices = 210
-slice_height = height // num_h_slices
+slicing_h = num_of_slices(height, desired_slice_width)
 
+num_h_slices = slicing_h[0]
+slice_height = slicing_h[1]
+print(f'Slicing horizontally by stripes of {slice_height}px')
 h_slices1 = []
 h_slices2 = []
 
@@ -68,12 +95,9 @@ joined_h_img_array = np.concatenate((joined_h_img_array1, joined_h_img_array2), 
 joined_h_image1 = Image.fromarray(joined_h_img_array1)
 joined_h_image2 = Image.fromarray(joined_h_img_array2)
 joined_h_image = Image.fromarray(joined_h_img_array)
-# joined_h_image1.show()
-# joined_h_image2.show()
 height, width, channels = joined_h_img_array.shape
-print(f"Width: {width}px, Height: {height}px")
+print(f"Horizontally sliced and concatenated. Width: {width}px, Height: {height}px")
 joined_h_image.show()
-
 
 # Ensure the images have the same width. if yes, concatenate vertically
 
@@ -83,7 +107,13 @@ try:
     total_img_array = np.concatenate((img_array, joined_img_array, joined_h_img_array), axis=0)
     total_image = Image.fromarray(total_img_array)
     total_image.show()
-    total_image.save('too_many_cats.jpg')
+    output_file_name = 'output/' + 'too_many_of_' + tail
+    total_image.save(output_file_name)
 except AssertionError:
-    joined_image.save('two_cats.jpg')
-    joined_h_image.save("four_cats.jpg")
+    print(f'Images must have the same width to put them into one.')
+    # If we can't join the pictures into one due to different dimensions, let's save them separately anyway
+finally:
+    output_file_name_1st_split = 'output/' + 'two_of_' + tail
+    joined_image.save(output_file_name_1st_split)
+    output_file_name_h_split = 'output/' + 'four_times_' + tail
+    joined_h_image.save(output_file_name_h_split)
